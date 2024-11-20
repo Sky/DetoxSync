@@ -18,6 +18,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// @param completionHandler The completion handler to call when React Native has finished loading.
 + (void)waitForReactNativeLoadWithCompletionHandler:(void (^)(void))completionHandler;
 
++ (BOOL) newArchEnabled;
+
 @end
 
 NS_ASSUME_NONNULL_END

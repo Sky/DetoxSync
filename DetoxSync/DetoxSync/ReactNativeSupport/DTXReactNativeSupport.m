@@ -64,7 +64,18 @@ static int __detox_sync_UIApplication_run(id self, SEL _cmd)
     m = class_getClassMethod(cls, NSSelectorFromString(@"runRunLoopThread"));
     dtx_log_info(@"Found legacy class RCTJSCExecutor");
     }
-  else
+
+    if (m == NULL && [DTXReactNativeSupport newArchEnabled])
+    {
+        //Modern RN
+        cls = NSClassFromString(@"RCTJSThreadManager");
+        if (cls != NULL) {
+            m = class_getClassMethod(cls, NSSelectorFromString(@"runRunLoop"));
+            dtx_log_info(@"Found modern class RCTJSThreadManager, method runRunLoop");
+        }
+    }
+
+    if (m == NULL)
     {
     //Modern RN
     cls = NSClassFromString(@"RCTCxxBridge");
@@ -215,23 +226,28 @@ static void _setupRNSupport(void)
   __block __weak id observer;
   __block __weak id observer2;
 
-  observer = [[NSNotificationCenter defaultCenter] addObserverForName:@"RCTJavaScriptDidLoadNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+  observer = [[NSNotificationCenter defaultCenter] addObserverForName:@"RCTContentDidAppearNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+    [[NSNotificationCenter defaultCenter] removeObserver:observer];
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        handler();
+    });
+  }];
+
+    observer2 = [[NSNotificationCenter defaultCenter] addObserverForName:@"RCTJavaScriptDidFailToLoadNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
     [[NSNotificationCenter defaultCenter] removeObserver:observer];
     [[NSNotificationCenter defaultCenter] removeObserver:observer2];
 
-    observer = [[NSNotificationCenter defaultCenter] addObserverForName:@"RCTContentDidAppearNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
-      [[NSNotificationCenter defaultCenter] removeObserver:observer];
-
-      handler();
-    }];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        handler();
+    });
   }];
+}
 
-  observer2 = [[NSNotificationCenter defaultCenter] addObserverForName:@"RCTJavaScriptDidFailToLoadNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
-    [[NSNotificationCenter defaultCenter] removeObserver:observer];
-    [[NSNotificationCenter defaultCenter] removeObserver:observer2];
-
-    handler();
-  }];
++ (BOOL) newArchEnabled
+{
+    NSObject<UIApplicationDelegate> *delegate = UIApplication.sharedApplication.delegate;
+    return [delegate valueForKey:@"newArchEnabled"];
 }
 
 + (void)cleanupBeforeReload
